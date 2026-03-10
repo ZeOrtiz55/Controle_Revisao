@@ -43,6 +43,16 @@ function saveDestinatarios(list: Destinatario[]) {
   localStorage.setItem(DESTINATARIOS_KEY, JSON.stringify(list));
 }
 
+function formatarData(valor: string | undefined | null): string {
+  if (!valor) return "—";
+  // Se já está no formato dd/mm/yyyy, retorna direto
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(valor)) return valor;
+  // Se é ISO ou yyyy-mm-dd, converte para pt-BR
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) return valor;
+  return d.toLocaleDateString("pt-BR");
+}
+
 export default function DashboardAgrupado() {
   const [tratores, setTratores] = useState<Trator[]>([]);
   const [busca, setBusca] = useState("");
@@ -372,7 +382,7 @@ export default function DashboardAgrupado() {
                         </div>
                         <div>
                           <p className="text-zinc-600 text-sm">Entrega</p>
-                          <p className="text-zinc-300 text-lg">{t.Entrega || "—"}</p>
+                          <p className="text-zinc-300 text-lg">{formatarData(t.Entrega)}</p>
                         </div>
                         <div>
                           <p className="text-zinc-600 text-sm">Vendedor</p>
@@ -530,9 +540,11 @@ export default function DashboardAgrupado() {
                     <h4 className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Informações</h4>
                     <div className="space-y-2">
                       {[
+                        ["Chassis", selecionado.Chassis || "—"],
+                        ["Motor", selecionado.Numero_Motor || "—"],
                         ["Vendedor", selecionado.Vendedor || "—"],
                         ["Cidade", selecionado.Cidade || "—"],
-                        ["Entrega", selecionado.Entrega || "—"],
+                        ["Entrega", formatarData(selecionado.Entrega)],
                       ].map(([label, value]) => (
                         <div key={label} className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-800/40 flex items-center justify-between">
                           <p className="text-sm text-zinc-600 uppercase tracking-wider font-medium">{label}</p>
@@ -607,7 +619,7 @@ export default function DashboardAgrupado() {
                                   </div>
                                   {data && (
                                     <div className="flex items-center gap-3 mt-0.5">
-                                      <span className="text-sm text-zinc-500">{data}</span>
+                                      <span className="text-sm text-zinc-500">{formatarData(data)}</span>
                                       {horas && <span className="text-sm text-emerald-400 font-medium">{horas}h</span>}
                                     </div>
                                   )}
@@ -644,7 +656,7 @@ export default function DashboardAgrupado() {
                                       <div className="grid grid-cols-3 gap-3">
                                         <div>
                                           <p className="text-xs text-zinc-600 uppercase tracking-wider mb-1">Data</p>
-                                          <p className="text-base text-zinc-200">{data}</p>
+                                          <p className="text-base text-zinc-200">{formatarData(data)}</p>
                                         </div>
                                         <div>
                                           <p className="text-xs text-zinc-600 uppercase tracking-wider mb-1">Horímetro</p>
