@@ -244,8 +244,24 @@ export default function DashboardAgrupado() {
       }
       setMsgEnvio("Email enviado com sucesso!");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      // Re-buscar emails após 3s para dar tempo do Gmail processar
-      setTimeout(() => fetchEmails(), 3000);
+
+      // Atualização otimista: adiciona o email no estado local imediatamente
+      const horasEnvio = revisaoEnvio.replace("h", "");
+      const chassisFinal = selecionado.Chassis.slice(-4);
+      const emailOtimista: EmailRevisao = {
+        subject: `CHEQUE DE REVISÃO - ${horasEnvio} HORAS - ${selecionado.Modelo} ${chassisFinal}`,
+        date: new Date().toISOString(),
+        uid: Date.now(),
+        horas: horasEnvio,
+        modelo: selecionado.Modelo,
+        chassisFinal,
+        attachments: [],
+        body: "",
+      };
+      setEmails(prev => [...prev, emailOtimista]);
+
+      // Re-buscar emails em background para sincronizar com Gmail
+      setTimeout(() => fetchEmails(), 5000);
     } catch {
       setMsgEnvio("Falha ao enviar email. Tente novamente.");
     } finally {
