@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list:*)",
+      "Bash(npm install:*)",
+      "Bash(npx next:*)",
+      "Bash(ls not:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(curl -s -X POST \"https://citrhumdkfivdzbmayde.supabase.co/rest/v1/tratores\" \\\\\n  -H \"apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpdHJodW1ka2ZpdmR6Ym1heWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMDgyNzUsImV4cCI6MjA4NDY4NDI3NX0.83x3-NrKoJgtIuSE7Jjsaj0zH-b-XJ3Z8i3XkBkwVoU\" \\\\\n  -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpdHJodW1ka2ZpdmR6Ym1heWRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxMDgyNzUsImV4cCI6MjA4NDY4NDI3NX0.83x3-NrKoJgtIuSE7Jjsaj0zH-b-XJ3Z8i3XkBkwVoU\" \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -H \"Prefer: return=representation\" \\\\\n  -d '{\n    \"Modelo\": \"MF 4709\",\n    \"Chassis\": \"TEST12345\",\n    \"Numero_Motor\": \"MOT-TEST-001\",\n    \"Vendedor\": \"Teste Vendedor\",\n    \"Cidade\": \"Maringá\",\n    \"Cliente\": \"Cliente Teste\",\n    \"Entrega\": \"2025-01-15\",\n    \"50h Data\": \"2025-02-10\",\n    \"50h Horimetro\": \"52\",\n    \"300h Data\": \"2025-06-20\",\n    \"300h Horimetro\": \"310\"\n  }')",
+      "Bash(git remote:*)",
+      "Bash(gh auth:*)",
+      "Bash(git credential-manager:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

@@ -76,21 +76,22 @@ export default function DashboardAgrupado() {
     setDestinatarios(loadDestinatarios());
   }, []);
 
+  const fetchEmails = async () => {
+    setLoadingEmails(true);
+    try {
+      const res = await fetch("/api/emails");
+      if (!res.ok) throw new Error("Erro ao buscar emails");
+      const data = await res.json();
+      setEmails(data.emails);
+      setEmailsCarregados(true);
+    } catch {
+      console.error("Falha ao buscar emails do Gmail.");
+    } finally {
+      setLoadingEmails(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchEmails = async () => {
-      setLoadingEmails(true);
-      try {
-        const res = await fetch("/api/emails");
-        if (!res.ok) throw new Error("Erro ao buscar emails");
-        const data = await res.json();
-        setEmails(data.emails);
-        setEmailsCarregados(true);
-      } catch {
-        console.error("Falha ao buscar emails do Gmail.");
-      } finally {
-        setLoadingEmails(false);
-      }
-    };
     fetchEmails();
   }, []);
 
@@ -243,6 +244,8 @@ export default function DashboardAgrupado() {
       }
       setMsgEnvio("Email enviado com sucesso!");
       if (fileInputRef.current) fileInputRef.current.value = "";
+      // Re-buscar emails após 3s para dar tempo do Gmail processar
+      setTimeout(() => fetchEmails(), 3000);
     } catch {
       setMsgEnvio("Falha ao enviar email. Tente novamente.");
     } finally {
@@ -429,7 +432,35 @@ export default function DashboardAgrupado() {
               </div>
 
               {/* Stats cards */}
-              <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-zinc-800/40 rounded-xl p-3 border border-zinc-800/60">
+                  <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium">Motor</p>
+                  {editandoMotor ? (
+                    <div className="mt-1">
+                      <input
+                        type="text"
+                        value={motorTemp}
+                        onChange={(e) => setMotorTemp(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") salvarMotor(); if (e.key === "Escape") setEditandoMotor(false); }}
+                        autoFocus
+                        className="w-full px-2 py-1 rounded-md bg-zinc-950 border border-zinc-700 text-zinc-100 text-lg font-semibold focus:ring-1 focus:ring-emerald-500 outline-none"
+                      />
+                      <div className="flex gap-2 mt-1.5">
+                        <button onClick={salvarMotor} className="text-emerald-400 hover:text-emerald-300 text-xs font-medium">Salvar</button>
+                        <button onClick={() => setEditandoMotor(false)} className="text-zinc-600 hover:text-zinc-400 text-xs">Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p
+                      className="text-2xl font-semibold text-white mt-0.5 cursor-pointer hover:text-emerald-400 transition-colors group/motor"
+                      onClick={() => { setMotorTemp(selecionado.Numero_Motor || ""); setEditandoMotor(true); }}
+                      title="Clique para editar"
+                    >
+                      {selecionado.Numero_Motor || <span className="text-zinc-600">—</span>}
+                      <span className="text-xs text-zinc-700 group-hover/motor:text-emerald-500 ml-1 font-normal">editar</span>
+                    </p>
+                  )}
+                </div>
                 <div className="bg-zinc-800/40 rounded-xl p-3 border border-zinc-800/60">
                   <p className="text-xs text-zinc-600 uppercase tracking-wider font-medium">Progresso</p>
                   <p className="text-2xl font-semibold text-white mt-0.5">{revisoesFeitas}<span className="text-zinc-600 text-base font-normal">/{totalRevisoes}</span></p>
@@ -481,42 +512,15 @@ export default function DashboardAgrupado() {
                   {/* Left - info cards */}
                   <div className="space-y-4">
                     <h4 className="text-sm font-medium text-zinc-500 uppercase tracking-wider">Informações</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Motor - editável */}
-                      <div className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-800/40">
-                        <p className="text-sm text-zinc-600 uppercase tracking-wider font-medium">Motor</p>
-                        {editandoMotor ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="text"
-                              value={motorTemp}
-                              onChange={(e) => setMotorTemp(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") salvarMotor(); if (e.key === "Escape") setEditandoMotor(false); }}
-                              autoFocus
-                              className="flex-1 px-2 py-1 rounded-md bg-zinc-950 border border-zinc-700 text-zinc-100 text-lg font-medium focus:ring-1 focus:ring-emerald-500 outline-none"
-                            />
-                            <button onClick={salvarMotor} className="text-emerald-400 hover:text-emerald-300 text-sm font-medium">Salvar</button>
-                            <button onClick={() => setEditandoMotor(false)} className="text-zinc-600 hover:text-zinc-400 text-sm">Cancelar</button>
-                          </div>
-                        ) : (
-                          <p
-                            className="text-lg text-zinc-200 mt-1 truncate font-medium cursor-pointer hover:text-emerald-400 transition-colors"
-                            onClick={() => { setMotorTemp(selecionado.Numero_Motor || ""); setEditandoMotor(true); }}
-                            title="Clique para editar"
-                          >
-                            {selecionado.Numero_Motor || "—"} <span className="text-xs text-zinc-600 ml-1">editar</span>
-                          </p>
-                        )}
-                      </div>
-                      {/* Outros campos */}
+                    <div className="space-y-2">
                       {[
                         ["Vendedor", selecionado.Vendedor || "—"],
                         ["Cidade", selecionado.Cidade || "—"],
                         ["Entrega", selecionado.Entrega || "—"],
                       ].map(([label, value]) => (
-                        <div key={label} className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-800/40">
+                        <div key={label} className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-800/40 flex items-center justify-between">
                           <p className="text-sm text-zinc-600 uppercase tracking-wider font-medium">{label}</p>
-                          <p className="text-lg text-zinc-200 mt-1 truncate font-medium">{value}</p>
+                          <p className="text-base text-zinc-200 font-medium">{value}</p>
                         </div>
                       ))}
                     </div>
