@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ImapFlow } from "imapflow";
+import { promises as fs } from "fs";
+import path from "path";
+import os from "os";
+
+const CACHE_DIR = path.join(os.tmpdir(), "revisao-attachment-cache");
+
+async function ensureCacheDir() {
+  try {
+    await fs.mkdir(CACHE_DIR, { recursive: true });
+  } catch {}
+}
+
+function getCacheKey(uid: string, part: string) {
+  return `${uid}-${part.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -13,6 +28,22 @@ export async function GET(request: NextRequest) {
       { error: "Parâmetros uid e part são obrigatórios." },
       { status: 400 }
     );
+  }
+
+  await ensureCacheDir();
+  const cachePath = path.join(CACHE_DIR, getCacheKey(uid, part));
+
+  // Tentar servir do cache primeiro (instantâneo)
+  try {
+    const cached = await fs.readFile(cachePath);
+    const headers = new Headers();
+    headers.set("Content-Type", contentType);
+    headers.set("Content-Length", cached.length.toString());
+    headers.set("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`);
+    headers.set("Cache-Control", "private, max-age=86400, immutable");
+    return new Response(cached, { status: 200, headers });
+  } catch {
+    // Não está no cache, baixar do Gmail
   }
 
   const user = process.env.GMAIL_USER;
@@ -40,7 +71,6 @@ export async function GET(request: NextRequest) {
     try {
       const { content } = await client.download(uid, part, { uid: true });
 
-      // Bufferar conteúdo para permitir visualização inline no iframe
       const chunks: Buffer[] = [];
       for await (const chunk of content) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
@@ -49,6 +79,11 @@ export async function GET(request: NextRequest) {
 
       lock.release();
       await client.logout();
+
+      // Salvar no cache para próximos acessos
+      try {
+        await fs.writeFile(cachePath, buffer);
+      } catch {}
 
       const headers = new Headers();
       headers.set("Content-Type", contentType);

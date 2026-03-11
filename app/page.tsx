@@ -74,7 +74,7 @@ export default function DashboardAgrupado() {
   const [destinatariosSelecionados, setDestinatariosSelecionados] = useState<Set<string>>(new Set());
   const [novoDestNome, setNovoDestNome] = useState("");
   const [novoDestEmail, setNovoDestEmail] = useState("");
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [horimetroEnvio, setHorimetroEnvio] = useState("");
   const [editandoMotor, setEditandoMotor] = useState(false);
   const [motorTemp, setMotorTemp] = useState("");
   const [showNovoTrator, setShowNovoTrator] = useState(false);
@@ -92,7 +92,16 @@ export default function DashboardAgrupado() {
       const res = await fetch("/api/emails");
       if (!res.ok) throw new Error("Erro ao buscar emails");
       const data = await res.json();
-      setEmails(data.emails);
+      setEmails(prev => {
+        const serverKeys = new Set(
+          data.emails.map((e: EmailRevisao) => `${e.chassisFinal}-${e.horas}`)
+        );
+        // Manter emails otimistas (uid alto = Date.now()) que o Gmail ainda não sincronizou
+        const otimistasRestantes = prev.filter(
+          e => e.uid > 1_000_000_000 && !serverKeys.has(`${e.chassisFinal}-${e.horas}`)
+        );
+        return [...data.emails, ...otimistasRestantes];
+      });
       setEmailsCarregados(true);
     } catch {
       console.error("Falha ao buscar emails do Gmail.");
@@ -228,6 +237,7 @@ export default function DashboardAgrupado() {
   const enviarEmail = async () => {
     if (!selecionado) return;
     if (!revisaoEnvio) { setMsgEnvio("Selecione a revisão."); return; }
+    if (!horimetroEnvio.trim()) { setMsgEnvio("Preencha o horímetro."); return; }
     if (!nomeRemetente.trim()) { setMsgEnvio("Preencha seu nome."); return; }
     if (destinatariosSelecionados.size === 0) { setMsgEnvio("Selecione pelo menos um destinatário."); return; }
     const files = fileInputRef.current?.files;
@@ -252,10 +262,34 @@ export default function DashboardAgrupado() {
         const res = await fetch("/api", { method: "POST", body: formData });
         if (!res.ok) throw new Error("Erro no envio");
       }
-      setMsgEnvio("Email enviado com sucesso!");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      // Atualizar revisão no Supabase
+      const hoje = new Date().toISOString().split("T")[0];
+      const { error: dbError } = await supabase
+        .from("tratores")
+        .update({
+          [`${revisaoEnvio} Data`]: hoje,
+          [`${revisaoEnvio} Horimetro`]: horimetroEnvio.trim(),
+        })
+        .eq("ID", selecionado.ID);
 
-      // Atualização otimista: adiciona o email no estado local imediatamente
+      if (dbError) {
+        setMsgEnvio("Email enviado, mas erro ao atualizar revisão: " + dbError.message);
+      } else {
+        // Atualizar estado local do trator
+        const updated = {
+          ...selecionado,
+          [`${revisaoEnvio} Data`]: hoje,
+          [`${revisaoEnvio} Horimetro`]: horimetroEnvio.trim(),
+        };
+        setSelecionado(updated);
+        setTratores(prev => prev.map(t => t.ID === selecionado.ID ? updated : t));
+        setMsgEnvio("Email enviado e revisão atualizada!");
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setHorimetroEnvio("");
+
+      // Atualização otimista: adiciona o email no estado local
       const horasEnvio = revisaoEnvio.replace("h", "");
       const chassisFinal = selecionado.Chassis.slice(-4);
       const emailOtimista: EmailRevisao = {
@@ -683,11 +717,7 @@ export default function DashboardAgrupado() {
                                                   key={i}
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (isPdf) {
-                                                      setPdfPreviewUrl(attUrl);
-                                                    } else {
-                                                      window.open(attUrl, "_blank");
-                                                    }
+                                                    window.open(attUrl, "_blank");
                                                   }}
                                                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-zinc-800/60 hover:bg-zinc-700/60 border border-zinc-700/40 transition-colors text-xs text-zinc-300"
                                                 >
@@ -696,7 +726,6 @@ export default function DashboardAgrupado() {
                                                   </span>
                                                   <span className="truncate max-w-[150px]">{att.filename}</span>
                                                   <span className="text-zinc-600">{formatFileSize(att.size)}</span>
-                                                  {isPdf && <span className="text-zinc-500 text-[10px]">visualizar</span>}
                                                 </button>
                                               );
                                             })}
@@ -837,8 +866,7 @@ export default function DashboardAgrupado() {
                                             <p className="text-xs text-zinc-300 truncate max-w-[180px] group-hover/att:text-white transition-colors">{att.filename}</p>
                                             <p className="text-[10px] text-zinc-600">{formatFileSize(att.size)}</p>
                                           </div>
-                                          {isPdf && <span className="text-[10px] text-zinc-500 shrink-0">visualizar</span>}
-                                        </button>
+                                                                                  </button>
                                       );
                                     })}
                                   </div>
@@ -947,7 +975,7 @@ export default function DashboardAgrupado() {
                       <div>
                         <h4 className="text-sm font-medium text-zinc-500 uppercase tracking-wider mb-3">Envio</h4>
                         <div className="rounded-xl border border-zinc-800/60 p-4 space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="text-xs text-zinc-600 uppercase tracking-wider mb-1 block">Revisão</label>
                               <select
@@ -960,6 +988,16 @@ export default function DashboardAgrupado() {
                                   <option key={r} value={r}>{r}</option>
                                 ))}
                               </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-600 uppercase tracking-wider mb-1 block">Horímetro</label>
+                              <input
+                                type="text"
+                                placeholder="Ex: 320"
+                                value={horimetroEnvio}
+                                onChange={(e) => setHorimetroEnvio(e.target.value)}
+                                className="w-full px-3 py-2.5 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-100 text-base placeholder-zinc-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-colors"
+                              />
                             </div>
                             <div>
                               <label className="text-xs text-zinc-600 uppercase tracking-wider mb-1 block">Seu nome</label>
@@ -1016,44 +1054,6 @@ export default function DashboardAgrupado() {
         </div>
         );
       })()}
-
-      {/* PDF Preview Modal */}
-      {pdfPreviewUrl && (
-        <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]"
-          onClick={() => setPdfPreviewUrl(null)}
-        >
-          <div
-            className="bg-zinc-900 rounded-2xl w-full max-w-5xl h-[90vh] overflow-hidden border border-zinc-800 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-3 border-b border-zinc-800">
-              <span className="text-base text-zinc-400">Visualizar PDF</span>
-              <div className="flex items-center gap-3">
-                <a
-                  href={pdfPreviewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-800"
-                >
-                  Baixar
-                </a>
-                <button
-                  onClick={() => setPdfPreviewUrl(null)}
-                  className="text-zinc-600 hover:text-zinc-300 transition-colors p-1.5 hover:bg-zinc-800 rounded-lg"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                </button>
-              </div>
-            </div>
-            <iframe
-              src={pdfPreviewUrl}
-              className="flex-1 w-full bg-zinc-950"
-              title="PDF Preview"
-            />
-          </div>
-        </div>
-      )}
 
       {/* Modal Novo Trator */}
       {showNovoTrator && (
